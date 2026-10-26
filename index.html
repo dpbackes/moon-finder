@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#040814" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <title>MoonPointer — Sky Compass &amp; AR Lunar Finder</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div class="brand">
+          <span class="brand-icon" aria-hidden="true">🌕</span>
+          <h1 class="brand-title">MoonPointer</h1>
+        </div>
+        <div class="top-actions">
+          <button
+            id="sensor-status-pill"
+            type="button"
+            class="status-pill status-waiting"
+            title="Sensor &amp; GPS Status"
+          >
+            TAP TO ENABLE SENSORS
+          </button>
+          <button
+            id="btn-toggle-drawer"
+            type="button"
+            class="icon-btn"
+            aria-label="Open Calibration and Simulation Controls"
+          >
+            <span>⚙️</span>
+            <span>Calibrate</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Mode Switcher (2D Sky Radar vs Live AR Camera) -->
+      <nav class="mode-bar" aria-label="View Mode">
+        <div class="segmented-control" role="tablist">
+          <button
+            id="btn-mode-radar"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            class="seg-btn active"
+          >
+            🧭 2D Sky Radar
+          </button>
+          <button
+            id="btn-mode-ar"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            class="seg-btn"
+          >
+            📷 Live AR Camera
+          </button>
+        </div>
+      </nav>
+
+      <!-- Live Pointing Guidance Banner -->
+      <section id="guidance-banner" class="guidance-banner" aria-live="polite">
+        <div id="guidance-primary" class="guidance-primary">
+          Calculating Moon position…
+        </div>
+        <div id="guidance-sub" class="guidance-sub">
+          Point your phone toward the sky or drag the radar to simulate
+        </div>
+      </section>
+
+      <!-- Central Sky Viewport (AR Video + Interactive High-DPI Canvas) -->
+      <section class="sky-viewport">
+        <video
+          id="ar-video"
+          class="hidden"
+          playsinline
+          muted
+          autoplay
+        ></video>
+        <div id="camera-notice" class="camera-notice hidden"></div>
+        <canvas id="sky-canvas"></canvas>
+      </section>
+
+      <!-- Bottom Lunar Telemetry Cards -->
+      <section class="telemetry-sheet" aria-label="Lunar Telemetry">
+        <div class="telemetry-grid">
+          <!-- Card 1: Moon Position -->
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>Moon Az / Alt</span>
+              <span id="val-moon-horizon" class="badge badge-up">Above Horizon</span>
+            </div>
+            <div id="val-moon-coords" class="card-value">—° / —°</div>
+            <div class="card-sub">
+              <span>Observer</span>
+              <span id="val-observer-loc">37.77°N, 122.42°W</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Phone Pointing Direction -->
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>Phone Az / Alt</span>
+            </div>
+            <div id="val-device-coords" class="card-value">—° / —°</div>
+            <div class="card-sub">
+              <span>Separation</span>
+              <span id="val-angular-delta">—° off target</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Phase, Illumination & Distance -->
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>Lunar Phase</span>
+              <span id="val-phase-emoji" aria-hidden="true">🌕</span>
+            </div>
+            <div id="val-phase-name" class="card-value">Full Moon</div>
+            <div class="card-sub">
+              <span id="val-illumination">100% Illuminated</span>
+              <span id="val-distance">384,400 km</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Next Moonrise & Moonset -->
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>Rise &amp; Set (Local)</span>
+            </div>
+            <div class="card-value" style="font-size: 0.84rem">
+              🌅 Rise: <span id="val-next-rise">—</span>
+            </div>
+            <div class="card-sub" style="margin-top: 4px; color: #e2e8f0; font-weight: 600">
+              <span>🌇 Set: <span id="val-next-set">—</span></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Calibration & Desktop Simulation Drawer -->
+      <aside
+        id="sim-drawer"
+        class="sim-drawer"
+        aria-label="Calibration and Simulation Drawer"
+      >
+        <div class="drawer-header">
+          <h2 class="drawer-title">⚙️ Calibration &amp; Simulation</h2>
+          <button id="btn-close-drawer" type="button" class="btn-small">
+            Done
+          </button>
+        </div>
+
+        <div class="drawer-section">
+          <div class="control-row">
+            <label for="chk-sim-mode">
+              Manual / Desktop Simulation Mode
+            </label>
+            <input id="chk-sim-mode" type="checkbox" />
+          </div>
+
+          <div class="control-row">
+            <label for="slider-sim-az">Simulated Heading (Az)</label>
+            <div class="slider-wrap">
+              <input
+                id="slider-sim-az"
+                type="range"
+                min="0"
+                max="359"
+                step="1"
+                value="180"
+              />
+              <span id="val-sim-az" class="slider-val">180°</span>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <label for="slider-sim-alt">Simulated Tilt (Alt)</label>
+            <div class="slider-wrap">
+              <input
+                id="slider-sim-alt"
+                type="range"
+                min="-90"
+                max="90"
+                step="1"
+                value="25"
+              />
+              <span id="val-sim-alt" class="slider-val">+25°</span>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <span>Quick Test Lock-On</span>
+            <button id="btn-snap-moon" type="button" class="btn-small btn-gold">
+              🎯 Snap Reticle to Moon
+            </button>
+          </div>
+        </div>
+
+        <div class="drawer-section">
+          <div class="control-row">
+            <label for="slider-compass-offset">Compass Calibration Offset</label>
+            <div class="slider-wrap">
+              <input
+                id="slider-compass-offset"
+                type="range"
+                min="-180"
+                max="180"
+                step="1"
+                value="0"
+              />
+              <span id="val-compass-offset" class="slider-val">0°</span>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <label for="select-pointing-mode">Phone Pointing Axis</label>
+            <select id="select-pointing-mode" class="select-input">
+              <option value="auto">Auto (Wand in 2D / Camera in AR)</option>
+              <option value="wand">Top Edge of Phone (Wand)</option>
+              <option value="camera">Back of Phone (Rear Camera)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="drawer-section">
+          <div class="control-row">
+            <label for="input-lat">Observer Lat / Lon</label>
+            <div class="coord-inputs">
+              <input
+                id="input-lat"
+                type="number"
+                step="0.01"
+                min="-90"
+                max="90"
+                value="37.7749"
+                aria-label="Latitude"
+              />
+              <input
+                id="input-lon"
+                type="number"
+                step="0.01"
+                min="-180"
+                max="180"
+                value="-122.4194"
+                aria-label="Longitude"
+              />
+              <button id="btn-apply-coords" type="button" class="btn-small">
+                Set
+              </button>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <label for="slider-time-offset">Time Offset (Hours)</label>
+            <div class="slider-wrap">
+              <input
+                id="slider-time-offset"
+                type="range"
+                min="-24"
+                max="24"
+                step="0.5"
+                value="0"
+              />
+              <span id="val-time-offset" class="slider-val">Now</span>
+              <button id="btn-reset-time" type="button" class="btn-small">
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Permission Onboarding Modal (shown when explicit gesture needed or tapped) -->
+      <div id="permission-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+          <div class="modal-icon" aria-hidden="true">🧭</div>
+          <h2 class="modal-title">Enable Sky Sensors</h2>
+          <p class="modal-desc">
+            MoonPointer uses your phone’s GPS location and orientation sensors
+            (compass &amp; accelerometer) to point you directly toward the Moon in
+            real time.
+          </p>
+          <div class="modal-actions">
+            <button id="btn-enable-sensors" type="button" class="btn-primary">
+              Enable GPS &amp; Compass Sensors
+            </button>
+            <button id="btn-use-sim-mode" type="button" class="btn-secondary">
+              Use Manual Simulation Mode Instead
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script defer src="./js/astronomy.js"></script>
+    <script defer src="./js/sensors.js"></script>
+    <script defer src="./js/renderer.js"></script>
+    <script defer src="./js/app.js"></script>
+  </body>
+</html>
